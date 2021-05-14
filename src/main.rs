@@ -1,3 +1,5 @@
+use std::{env, process};
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -5,6 +7,10 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 }
+
+mod dir;
+
+use dir::exec_fd_readdir;
 
 // Returns: (rights_base, rights_inheriting)
 pub unsafe fn fd_get_rights(fd: wasi::Fd) -> (wasi::Rights, wasi::Rights) {
@@ -44,15 +50,32 @@ fn open_scratch_directory(path: &str) -> Result<wasi::Fd, String> {
 }
 
 fn main() {
-    let stdout = 1;
-    let message = "Hello, World!\n";
-    let data = [wasi::Ciovec {
-        buf: message.as_ptr(),
-        buf_len: message.len(),
-    }];
-    let res = open_scratch_directory(".");
-    println!("{:?}", res);
+    let mut args = env::args();
+    let prog = args.next().unwrap();
+    let arg = if let Some(arg) = args.next() {
+        arg
+    } else {
+        eprintln!("usage: {} <scratch directory>", prog);
+        process::exit(1);
+    };
+    let dir_fd = match open_scratch_directory(&arg) {
+        Ok(dir_fd) => dir_fd,
+        Err(err) => {
+            eprintln!("{}", err);
+            process::exit(1)
+        }
+    };
+
     unsafe {
-        wasi::fd_write(stdout, &data).unwrap();
+        // Check the behavior in an empty directory
+        let (mut dirs, eof) = exec_fd_readdir(dir_fd, 0);
+        assert!(eof, "expected to read the entire directory");
+        dirs.sort_by_key(|d| d.name.clone());
+        for elem in dirs {
+            println!("{}", elem.name);
+        }
+        // wasi::fd_write(stdout, &data).unwrap();
+        // let stat = wasi::fd_fdstat_get(res.unwrap()).unwrap();
+        // println!("{:?}", stat);
     }
 }
