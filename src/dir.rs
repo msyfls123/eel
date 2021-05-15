@@ -1,4 +1,4 @@
-/// from: https://github.com/bytecodealliance/wasmtime/blob/main/crates/test-programs/wasi-tests/src/bin/fd_readdir.rs
+//! from: https://github.com/bytecodealliance/wasmtime/blob/main/crates/test-programs/wasi-tests/src/bin/fd_readdir.rs
 
 use std::{mem, slice, str};
 
