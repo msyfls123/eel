@@ -59,7 +59,7 @@ pub unsafe fn exec_fd_readdir(fd: wasi::Fd, cookie: wasi::Dircookie) -> (Vec<Dir
     let bufused =
         wasi::fd_readdir(fd, buf.as_mut_ptr(), BUF_LEN, cookie).expect("failed fd_readdir");
 
-    println!("buf {:?}", buf);
+    // println!("buf {:?}", buf);
     assert!(bufused <= BUF_LEN);
 
     let sl = slice::from_raw_parts(buf.as_ptr(), bufused);

@@ -1,6 +1,5 @@
 use std::{process};
-use std::ffi::{OsStr, CStr};
-use std::os::wasi::ffi::OsStrExt;
+use std::ffi::{CStr};
 
 mod dir;
 
@@ -13,7 +12,7 @@ pub unsafe fn fd_get_rights(fd: wasi::Fd) -> (wasi::Rights, wasi::Rights) {
 }
 
 /// why start with 3: https://stackoverflow.com/questions/36771266/what-is-the-use-of-fd-file-descriptor-in-node-js/36771339
-fn open_scratch_directory(path: &str) -> Result<wasi::Fd, String> {
+fn open_scratch_directory(path: &str, target: &str) -> Result<wasi::Fd, String> {
     unsafe {
         for i in 3.. {
             let stat = match wasi::fd_prestat_get(i) {
@@ -31,10 +30,13 @@ fn open_scratch_directory(path: &str) -> Result<wasi::Fd, String> {
                 continue;
             }
             dst.set_len(stat.u.dir.pr_name_len);
-            if dst == path.as_bytes() {
+            println!("{:?}: {:?}", String::from_utf8(dst.clone()), path);
+            let dst_str = String::from_utf8(dst.clone()).unwrap();
+            let dst_str = dst_str.trim_matches(char::from(0));
+            if dst_str == path {
                 let (base, inherit) = fd_get_rights(i);
                 return Ok(
-                    wasi::path_open(i, 0, ".", wasi::OFLAGS_DIRECTORY, base, inherit, 0)
+                    wasi::path_open(i, 0, target, wasi::OFLAGS_DIRECTORY, base, inherit, 0)
                         .expect("failed to open dir"),
                 );
             }
@@ -63,13 +65,11 @@ fn main() {
         let mut ret = Vec::with_capacity(argc);
         for ptr in argv {
             let s = CStr::from_ptr(ptr.cast());
-            ret.push(OsStr::from_bytes(s.to_bytes()).to_owned());
+            ret.push(s.to_str().unwrap());
         }
-        println!("{:?}: {}", ret, String::from_utf8(argv_buf).unwrap());
-    
-        let arg = ret[1].clone().into_string().unwrap();
+        println!("{:?}", ret);
 
-        let dir_fd = match open_scratch_directory(&arg) {
+        let dir_fd = match open_scratch_directory(&ret[1], &ret[2]) {
             Ok(dir_fd) => dir_fd,
             Err(err) => {
                 eprintln!("{}", err);
