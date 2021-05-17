@@ -63,13 +63,13 @@ fn main() {
         wasi::args_get(argv.as_mut_ptr(), argv_buf.as_mut_ptr()).unwrap();
         argv.set_len(argc);
         let mut ret = Vec::with_capacity(argc);
-        for ptr in argv {
+        for ptr in &argv[1..] {
             let s = CStr::from_ptr(ptr.cast());
             ret.push(s.to_str().unwrap());
         }
         println!("{:?}", ret);
 
-        let dir_fd = match open_scratch_directory(&ret[1], &ret[2]) {
+        let dir_fd = match open_scratch_directory(&ret[0], &ret[1]) {
             Ok(dir_fd) => dir_fd,
             Err(err) => {
                 eprintln!("{}", err);
@@ -88,5 +88,34 @@ fn main() {
         // wasi::fd_write(stdout, &data).unwrap();
         // let stat = wasi::fd_fdstat_get(res.unwrap()).unwrap();
         // println!("{:?}", stat);
+
+        let file_name = ret[2];
+        let size = wasi::path_filestat_get(dir_fd, 0, file_name).unwrap().size as usize;
+        let mut buffer = vec![0u8; size];
+
+        let file_fd = wasi::path_open(
+            dir_fd,
+            0,
+            file_name,
+            wasi::OFLAGS_CREAT,
+            wasi::RIGHTS_FD_READ
+                | wasi::RIGHTS_FD_WRITE
+                | wasi::RIGHTS_FD_SEEK
+                | wasi::RIGHTS_FD_TELL
+                | wasi::RIGHTS_FD_FDSTAT_SET_FLAGS,
+            0,
+            wasi::FDFLAGS_APPEND,
+        )
+        .expect("opening a file");
+
+        wasi::fd_read(
+            file_fd,
+            &[wasi::Iovec {
+                buf: buffer.as_mut_ptr(),
+                buf_len: buffer.len(),
+            }]
+        )
+        .expect("reading file");
+        println!("read file: {:?}", String::from_utf8(buffer));
     }
 }
